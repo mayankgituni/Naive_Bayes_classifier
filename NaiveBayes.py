@@ -8,12 +8,45 @@ Created on Fri Mar 22 20:05:07 2019
 
 import operator
 
+###############################################################################
+###############################################################################
+################ HELPER FUNCTIONS FOR THE NAIVE BAYES CLASS ###################
+###############################################################################
+###############################################################################
+def intersectionOfLists(list1, list2):
+    return len(set(list1) & set(list2))
 
+def convertIntoFreqTable(dataSet):
+
+    freqTable = {}
+    
+    for i in range(len(dataSet)):
+        if dataSet[i] not in freqTable:
+            freqTable[dataSet[i]] = []
+            
+        freqTable[dataSet[i]].append(i)
+        
+        # removing empty('?') values from the list
+        if '?' in freqTable.keys():
+            del freqTable['?']
+            
+    return freqTable
+
+def findMaxValueKey(dictinary):
+        return max(dictinary.items(), key=operator.itemgetter(1))[0]
+
+###############################################################################
+###############################################################################
+################ NAIVE BAYES CLASS TO CREATE A CLASSIFIER #####################
+###############################################################################
+###############################################################################
 class NaiveBayes:
     def __init__(self, dataSet):
         
         self.dataSize = len(dataSet)
         self.parseDataSet(dataSet)
+        self.lSmoothing = False
+        self.laplacianUsed = False
         
     def parseDataSet(self, dataSet):
         
@@ -27,22 +60,7 @@ class NaiveBayes:
         self.createFeatureFreqTable(dataX)
         self.createLabelFreqTable(dataY)
     
-    def convertIntoFreqTable(self, dataSet):
-        
-        freqTable = {}
-        
-        for i in range(self.dataSize):
-            if dataSet[i] not in freqTable:
-                freqTable[dataSet[i]] = []
-                
-            freqTable[dataSet[i]].append(i)
-            
-            # removing empty('?') values from the list
-            if '?' in freqTable.keys():
-                del freqTable['?']
-                
-        return freqTable
-    
+#  CREATE FREQUENCY TABLES FOR FEATURES
     def createFeatureFreqTable(self, dataSet):
         
         self.features = []
@@ -57,39 +75,64 @@ class NaiveBayes:
                 featureData[i].append(line[i])
         
         for i in range(featuresCount):
-            self.features.append(self.convertIntoFreqTable(featureData[i]))
+            self.features.append(convertIntoFreqTable(featureData[i]))
 
-    
+#  CREATE FREQUENCY TABLES FOR LABLES
     def createLabelFreqTable(self, dataSet):
-        self.labels = self.convertIntoFreqTable(dataSet)        
-    
+        self.labels = convertIntoFreqTable(dataSet)        
+
+#  CALCULATE PRIOR PROBABULITY P(LABELS)
     def calculatePriorProb(self, label):
         return len(self.labels[label]) / self.dataSize
-    
-    def intersectionOfLists(self, list1, list2):
-        return len(set(list1) & set(list2))
-    
+
+#  CALCULATE POSTERIOR PROBABILITY P(FEATURES | LABEL)
     def calculatePosteriorProb(self, feature, label):
         
         prob = 1
+        epsilon = 0.5 / self.dataSize
+        labelcount = len(self.labels[label])
         
         for index in range(len(feature)):
-            intersectionCount = self.intersectionOfLists(self.labels[label], self.features[index][feature[index]])
-            labelcount = len(self.labels[label])
-            prob *= float(intersectionCount / labelcount)
-        
+            if (feature[index] != '?'):
+                intersectionCount = intersectionOfLists(self.labels[label], 
+                                                        self.features[index][feature[index]])
+                p = float(intersectionCount / labelcount)
+                
+                # Apply epsilon smoothing
+                if ((p == 0.0) and (not self.lSmoothing)):
+                    prob *= epsilon
+                elif ((p == 0.0) and self.lSmoothing):
+                    prob = 0.0
+                    break
+                else:
+                    prob *= p   
+                
+        # Apply laplacian smoothing
         if(prob == 0.0):
-            print('Smoothing needed')
-            pass
-            #prob = self.epsilonSmoothing(feature, label)
+            prob = self.laplacianSmoothing(feature, label)
+            self.laplacianUsed = True
             
+        return prob 
+    
+# Calculating the probability of features using laplacian smoothing
+    def laplacianSmoothing(self, feature, label):
+        
+        prob = 1
+        labelcount = len(self.labels[label])
+        
+        for index in range(len(feature)):
+            if (feature[index] != '?'):
+                intersectionCount = intersectionOfLists(self.labels[label], 
+                                                        self.features[index][feature[index]])
+                
+                p = float((intersectionCount+0.5) / (labelcount + len(self.features[index])))    
+                prob *= p
+                
         return prob
-    
-    def epsilonSmoothing(self, feature, label):
-        pass
-    
-    def findMaxProb(self, probability):
-        return max(probability.items(), key=operator.itemgetter(1))[0]
+
+# Turn on/off the laplacian smoothing option
+    def laplacianSmooth(self, switch):
+        self.lSmoothing = switch
     
     def predict(self, dataSet):
         
@@ -100,8 +143,17 @@ class NaiveBayes:
             probability = {}
             
             for label in self.labels.keys():
-                probability[label] = self.calculatePriorProb(label) * self.calculatePosteriorProb(line, label)
+                if(self.laplacianUsed):
+                    postProb = self.laplacianSmoothing(line, label)
+                else:
+                    postProb = self.calculatePosteriorProb(line, label)
+                                    
+                probability[label] = self.calculatePriorProb(label) * postProb
+                
+            self.laplacianUsed = False
+            
             print("Prob: ", probability)
-            result.append(self.findMaxProb(probability))
+            result.append(findMaxValueKey(probability))
+            
         print('Result: ', result)
         return result

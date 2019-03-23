@@ -27,10 +27,10 @@ def train(trainData):
     
 def main():
     fileName = "./2019S1-proj1-data/playGolf.csv"
-    [trainData, testData] = preprocess(fileName, 0.8)
+    [trainData, testData] = preprocess(fileName, 0.9)
     
     classifier = train(trainData)
-    
+    classifier.laplacianSmooth(True)
     classifier.predict(testData)
     
 if __name__ == "__main__":
