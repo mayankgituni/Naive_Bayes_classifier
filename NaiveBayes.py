@@ -42,11 +42,11 @@ def findMaxValueKey(dictinary):
 ###############################################################################
 class NaiveBayes:
     def __init__(self, dataSet):
-        
-        self.dataSize = len(dataSet)
-        self.parseDataSet(dataSet)
         self.lSmoothing = False
         self.laplacianUsed = False
+        self.dataSize = len(dataSet)
+        self.parseDataSet(dataSet)
+        
         
     def parseDataSet(self, dataSet):
         
@@ -76,10 +76,10 @@ class NaiveBayes:
         
         for i in range(featuresCount):
             self.features.append(convertIntoFreqTable(featureData[i]))
-
+            
 #  CREATE FREQUENCY TABLES FOR LABLES
     def createLabelFreqTable(self, dataSet):
-        self.labels = convertIntoFreqTable(dataSet)        
+        self.labels = convertIntoFreqTable(dataSet)     
 
 #  CALCULATE PRIOR PROBABULITY P(LABELS)
     def calculatePriorProb(self, label):
@@ -89,26 +89,29 @@ class NaiveBayes:
     def calculatePosteriorProb(self, feature, label):
         
         prob = 1
-        epsilon = 0.5 / self.dataSize
+        epsilon = 0.1 / self.dataSize
         labelcount = len(self.labels[label])
         
         for index in range(len(feature)):
-            if (feature[index] != '?'):
-                intersectionCount = intersectionOfLists(self.labels[label], 
-                                                        self.features[index][feature[index]])
+            if ((feature[index] != '?') ):
+                if (feature[index] in self.features[index]):
+                    intersectionCount = intersectionOfLists(self.labels[label], 
+                                                            self.features[index][feature[index]])
+                else:
+                    intersectionCount = 0.0
+                        
                 p = float(intersectionCount / labelcount)
                 
                 # Apply epsilon smoothing
                 if ((p == 0.0) and (not self.lSmoothing)):
                     prob *= epsilon
                 elif ((p == 0.0) and self.lSmoothing):
-                    prob = 0.0
                     break
                 else:
                     prob *= p   
-                
+        
         # Apply laplacian smoothing
-        if(prob == 0.0):
+        if(prob == 0.0 and self.lSmoothing):
             prob = self.laplacianSmoothing(feature, label)
             self.laplacianUsed = True
             
@@ -122,8 +125,11 @@ class NaiveBayes:
         
         for index in range(len(feature)):
             if (feature[index] != '?'):
-                intersectionCount = intersectionOfLists(self.labels[label], 
+                if (feature[index] in self.features[index]):
+                    intersectionCount = intersectionOfLists(self.labels[label], 
                                                         self.features[index][feature[index]])
+                else:
+                    intersectionCount = 0.0
                 
                 p = float((intersectionCount+0.5) / (labelcount + len(self.features[index])))    
                 prob *= p
@@ -151,9 +157,6 @@ class NaiveBayes:
                 probability[label] = self.calculatePriorProb(label) * postProb
                 
             self.laplacianUsed = False
-            
-            print("Prob: ", probability)
             result.append(findMaxValueKey(probability))
-            
-        print('Result: ', result)
+           
         return result
