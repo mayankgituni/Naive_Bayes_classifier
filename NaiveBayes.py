@@ -7,7 +7,9 @@ Created on Fri Mar 22 20:05:07 2019
 """
 
 import operator
-
+import numpy as np
+from decimal import Decimal, getcontext
+getcontext().prec = 5
 ###############################################################################
 ###############################################################################
 ################ HELPER FUNCTIONS FOR THE NAIVE BAYES CLASS ###################
@@ -32,6 +34,27 @@ def convertIntoFreqTable(dataSet):
             
     return freqTable
 
+def createConfusionMatrix(predicted, actual):
+    classIndex = convertIntoFreqTable(predicted)
+    
+    index = 0
+    for key in classIndex.keys():
+        classIndex[key] = index
+        index += 1
+        
+    print(classIndex)
+    classSize = len(classIndex)
+    confusionMatrix = np.zeros(shape=(classSize, classSize))
+    
+    size = len(predicted)
+    for i in range(size):
+        if predicted[i] in classIndex.keys() and actual[i] in classIndex.keys():
+            pIndex = classIndex[predicted[i]]
+            aIndex = classIndex[actual[i]]
+            confusionMatrix[aIndex][pIndex] += 1
+    
+    return confusionMatrix
+
 def findMaxValueKey(dictinary):
         return max(dictinary.items(), key=operator.itemgetter(1))[0]
 
@@ -41,12 +64,11 @@ def findMaxValueKey(dictinary):
 ###############################################################################
 ###############################################################################
 class NaiveBayes:
-    def __init__(self, dataSet):
-        self.lSmoothing = False
-        self.laplacianUsed = False
+    
+    def train(self, dataSet):
         self.dataSize = len(dataSet)
+        self.epsilon = 0.1/self.dataSize
         self.parseDataSet(dataSet)
-        
         
     def parseDataSet(self, dataSet):
         
@@ -64,16 +86,16 @@ class NaiveBayes:
     def createFeatureFreqTable(self, dataSet):
         
         self.features = []
-        featureData = [[]*len(dataSet[0])]
+        featureData = []
         featuresCount = len(dataSet[0])
         
-        for i in range(featuresCount-1):
+        for i in range(featuresCount):
             featureData.append([])
-  
+            
         for line in dataSet:
             for i in range(featuresCount):
                 featureData[i].append(line[i])
-        
+                
         for i in range(featuresCount):
             self.features.append(convertIntoFreqTable(featureData[i]))
             
@@ -89,74 +111,61 @@ class NaiveBayes:
     def calculatePosteriorProb(self, feature, label):
         
         prob = 1
-        epsilon = 0.1 / self.dataSize
+        
         labelcount = len(self.labels[label])
         
         for index in range(len(feature)):
-            if ((feature[index] != '?') ):
-                if (feature[index] in self.features[index]):
-                    intersectionCount = intersectionOfLists(self.labels[label], 
-                                                            self.features[index][feature[index]])
-                else:
-                    intersectionCount = 0.0
-                        
-                p = float(intersectionCount / labelcount)
+            if ((feature[index] != '?') and (feature[index] in self.features[index])):
+                intersectionCount = intersectionOfLists(self.labels[label], 
+                                                        self.features[index][feature[index]])
                 
                 # Apply epsilon smoothing
-                if ((p == 0.0) and (not self.lSmoothing)):
-                    prob *= epsilon
-                elif ((p == 0.0) and self.lSmoothing):
-                    break
+                if (intersectionCount == 0):
+                    prob *= self.epsilon
                 else:
-                    prob *= p   
-        
-        # Apply laplacian smoothing
-        if(prob == 0.0 and self.lSmoothing):
-            prob = self.laplacianSmoothing(feature, label)
-            self.laplacianUsed = True
-            
+                    prob *= float(intersectionCount / labelcount)
+                    
         return prob 
     
-# Calculating the probability of features using laplacian smoothing
-    def laplacianSmoothing(self, feature, label):
-        
-        prob = 1
-        labelcount = len(self.labels[label])
-        
-        for index in range(len(feature)):
-            if (feature[index] != '?'):
-                if (feature[index] in self.features[index]):
-                    intersectionCount = intersectionOfLists(self.labels[label], 
-                                                        self.features[index][feature[index]])
-                else:
-                    intersectionCount = 0.0
-                
-                p = float((intersectionCount+0.5) / (labelcount + len(self.features[index])))    
-                prob *= p
-                
-        return prob
-
-# Turn on/off the laplacian smoothing option
-    def laplacianSmooth(self, switch):
-        self.lSmoothing = switch
-    
-    def predict(self, dataSet):
+    def predict(self, testDataSet):
         
         result = []
         
-        for line in dataSet:
-            line = line[:-1]
+        for line in testDataSet:
             probability = {}
             
             for label in self.labels.keys():
-                if(self.laplacianUsed):
-                    postProb = self.laplacianSmoothing(line, label)
-                else:
-                    postProb = self.calculatePosteriorProb(line, label)
-                                    
+                postProb = self.calculatePosteriorProb(line, label)
                 probability[label] = self.calculatePriorProb(label) * postProb
                 
-            self.laplacianUsed = False
             result.append(findMaxValueKey(probability))
            
         return result
+    
+    def evaluate(self, predicted, actual):
+        
+        metrics = {'precision':[], 'recall':[], 'fScore':[], 'weightedAvg':[]}
+        cMatrix = createConfusionMatrix(predicted, actual)
+        classSize = len(cMatrix)
+        print(cMatrix)
+        # Calculate precision
+        TPFP = np.sum(cMatrix, axis=0)
+        TPFN = np.sum(cMatrix, axis=1)
+        
+        for i in range(classSize):
+            precision = cMatrix[i][i]/TPFP[i]
+            recall = cMatrix[i][i]/TPFN[i]
+            metrics['precision'].append(np.around(precision, decimals=5))
+            metrics['recall'].append(np.around(recall, decimals=5))
+            metrics['fScore'].append(np.around(2*precision*recall/(precision+recall),
+                   decimals=5))
+        
+        metrics['weightedAvg'].append(np.around(np.sum(metrics['precision'])/classSize, decimals=5))
+        metrics['weightedAvg'].append(np.around(np.sum(metrics['recall'])/classSize, decimals=5))
+        metrics['weightedAvg'].append(np.around(np.sum(metrics['fScore'])/classSize, decimals=5))
+        
+        metrics['macroAvg'] = np.around(2 * metrics['weightedAvg'][0] * metrics['weightedAvg'][1]/(metrics['weightedAvg'][0] + metrics['weightedAvg'][1]), decimals=5)
+        metrics['accuracy'] = np.around(np.sum(cMatrix.diagonal()) / np.sum(cMatrix), decimals=5)
+        print(metrics)
+        return metrics
+    
