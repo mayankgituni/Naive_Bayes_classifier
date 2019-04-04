@@ -3,7 +3,12 @@
 """
 Created on Fri Mar 22 20:05:07 2019
 
-@author: mayanktomar
+@author: Mayank Tomar
+
+Note: The following implementation of the Naive Bayes is NOT created with a
+efficiency in the mind. This class was created for an educational purpose and
+to study various aspects of the Naive Bayes model and algorythms and methods. 
+Therefore, one may find the implementation of the class to be long and ineffiecient.
 """
 
 import operator
@@ -26,6 +31,7 @@ class NaiveBayes:
         self.epsilon = 0.1/self.dataSize
         self.parseDataSet(dataSet)
         
+# PREPARE THE DATA AND CREATE FREQUENCY MATRIX WHEN THE CLASS IS CREATED  
     def parseDataSet(self, dataSet):
         
         dataX = []
@@ -62,7 +68,8 @@ class NaiveBayes:
                     prob *= float(intersectionCount / labelcount)
                     
         return prob
-    
+
+# PREDICT THE LABELS AND RETURN THE RESULT
     def predict(self, testDataSet):
         
         result = []
@@ -77,9 +84,9 @@ class NaiveBayes:
             result.append(findMaxValueKey(probability))
            
         return result
-    
+
+# EVALUATES THE MODEL AND CALCULATES THE PRECISION, RECALL, F-SCORE, ACCURACY
     def evaluate(self, predicted, actual):
-        
         
         precision = []
         recall = [] 
@@ -135,6 +142,7 @@ class NaiveBayes:
 def intersectionOfLists(list1, list2):
     return len(set(list1) & set(list2))
 
+# CREATE THE FREQUENCY TABLE AND RETURN AS A DICT.
 def convertIntoFreqTable(dataSet):
 
     freqTable = {}
@@ -151,7 +159,7 @@ def convertIntoFreqTable(dataSet):
             
     return freqTable
 
-#  CREATE FREQUENCY TABLES FOR FEATURES
+#  CREATE FREQUENCY TABLES FOR FEATURES FOR LATER CALCULATIONS
 def createFeatureFreqTable(dataSet):
     
     features = []
@@ -160,16 +168,17 @@ def createFeatureFreqTable(dataSet):
     
     for i in range(featuresCount):
         featureData.append([])
-        
+    
     for line in dataSet:
         for i in range(featuresCount):
             featureData[i].append(line[i])
-            
+    
     for i in range(featuresCount):
         features.append(convertIntoFreqTable(featureData[i]))
     
     return features
 
+# CREATE THE CONFUSION MATRIX FOR THE EVALUATION PROCESS
 def createConfusionMatrix(predicted, actual):
     classIndex = convertIntoFreqTable(actual)
     
@@ -178,7 +187,6 @@ def createConfusionMatrix(predicted, actual):
         classIndex[key] = index
         index += 1
         
-#    print(classIndex)
     classSize = len(classIndex)
     confusionMatrix = np.zeros(shape=(classSize, classSize))
     
